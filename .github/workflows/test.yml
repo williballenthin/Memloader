@@ -1,0 +1,61 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions: read-all
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uvx ruff check memloader memloader_plugin.py tests
+      - run: uvx ruff format --check memloader memloader_plugin.py tests
+      - run: uvx --from ida-hcli hcli plugin lint .
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv run --group dev pytest tests -v
+
+  idalib-tests:
+    name: idalib tests on IDA ${{ matrix.ida-version }} / Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+        ida-version: ["9.2", "latest"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - name: Install IDA
+        run: |
+          uvx --from ida-hcli hcli ida install \
+            --download-id "ida-pro:${{ matrix.ida-version }}" \
+            --license-id "${IDA_LICENSE_ID}" \
+            --install-dir "${{ runner.temp }}/ida" \
+            --accept-eula --set-default --yes
+        env:
+          HCLI_API_KEY: ${{ secrets.HCLI_API_KEY }}
+          IDA_LICENSE_ID: ${{ secrets.IDA_LICENSE_ID }}
+
+      - name: Run tests
+        run: uv run --group dev pytest tests -v
+        env:
+          IDADIR: ${{ runner.temp }}/ida

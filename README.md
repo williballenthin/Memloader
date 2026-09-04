@@ -1,133 +1,65 @@
-## Memory loader
-Memory loader is a DLL based on IDA SDK that allows you to load files into IDA and reverse them
-without writing the actual file to the disk. This scenario is very useful when you are reversing a malware
-and you have a static detection-based antivirus on your PC. The memory loader itself is a DLL, that
-the MemZipLoader and URLLoader are using in order to load the buffers they provide, either from a zip file or URLs into
-IDA database.</br>
-The idea for the memory loader came from my team member [Kasif Dekel](https://twitter.com/kasifdekel).
-</br></br>
-![Mem Loader](./pics/memory_loader.png)
+# Memloader
 
-## Mem Zip loader
-Mem Zip Loader uses the memory loader (mentioned above) to load a file from a plain/encrypted zip file. In case the ZIP file is password protected, it will ask for a password.
-Then, it will display a dropdown menu with files inside the ZIP, and let you choose one of them.
-Finally, it will load the chosen file into memory with the memory loader, without writing anything to disk.</br></br>
-![Mem Zip Loader](./pics/dropbox_example.png)
+Memloader is an IDA plugin with two file loaders. Both bring a file into the IDA database without writing that file to disk.
 
-## URL loader
-The URL loader uses the memory loader to load files from an arbitrary URL into memory without writing to disk. The loader first asks the user for a
-URL and then tries to download a file from that URL. Then uses the memory loader to load it into IDA.</br>
-![Url Loader](./pics/url_loader.png)
+- **Memloader ZIP** opens a ZIP archive, lets you pick one member, decrypts it when needed, and hands the bytes to IDA's regular file format loaders.
+- **Memloader URL** downloads a file from a URL and loads the bytes the same way.
 
-## Requirements for developlment
-<h4>How to build on Windows with VS 2019 x64:</h4>’
-<table>
-    <tr>
-        <td>1. Open a visual studio DLL project.</td>
-    </tr>
-    <tr>
-        <td>2. Fix the IDK SDK include (Configuration Properties -> C/C++ -> Additional Include Directories), make sure the (.h) header files to match your IDA SDK files paths.</td>
-    </tr>
-    <tr>
-        <td>3. Fix the IDA SDK include libs (Configuration Properties -> Linker -> Additional Library Directories) make sure the *.lib files to match your IDA SDK files paths.</td>
-    </tr>
-    <tr>
-        <td>
-            4. Fix the Preprocessor defenitions. (Configuration Properties -> C/C++ -> Preprocessor Definitions)
-            </br>&nbsp;&nbsp;&nbsp;&nbsp;x64: define __EA64__
-            </br>&nbsp;&nbsp;&nbsp;&nbsp;x86: define __X64__;__NT__ &  undefine: __EA64__
-        </td>
-    </tr>
-    <tr>
-        <td>5. This project can be built for IDA 64-bit as 64-bit executable the configuration x64_debug`.</td>
-    </tr>
-    <tr>
-        <td>6. In addition, the project can be built for IDA 64-bit as 32-bit executable with the configuration Debug_32_address_ida.</td>
-    </tr>
-</table>
-</p>
+Only the IDA database is written. The sample stays inside the archive or on the remote server, which keeps it away from antivirus software that scans files on disk. When no IDA loader recognizes the bytes, Memloader maps them as raw x86 shellcode at address 0.
 
+The loaders are a Python port of the C++ Memloader plugin by [Kasif Dekel](https://twitter.com/kasifdekel) at SentinelLabs.
 
 ## Installation
-lace the Memory Loader DLL files in IDA's directory</br>![Loaders image](./pics/base_ida.png)</br>
-The nameing convertion is:
-<table>
-	<tr>
-		<td>x86</td>
-        <td>MemoryLoader.dll</td>
-	</tr>
-	<tr>
-		<td>x64</td>
-        <td>MemoryLoader64.dll</td>
-	</tr>
-</table>
 
-Place the loaders files in IDA's loaders directory</br>![Loaders image](./pics/loaders.png)</br>
-The nameing convertion is:
-<table>
-	<tr>
-		<td>x86</td>
-        <td>MemZipLoader.dll</td>
-        <td>UrlLoader.dll</td>
-	</tr>
-	<tr>
-		<td>x64</td>
-        <td>MemZipLoader64.dll</td>
-        <td>UrlLoader64.dll</td>
-	</tr>
-</table>
+```
+hcli plugin install memloader
+```
 
-## Usage
-<table>
-	<tr>
-		<td>MemZipLoader</td>
-        <td>
-            The loader accepts ZIP files, opens a dropbox, indexing and displaying all files inside. (recursive directory search)
-            The file will be extracted to a buffer without any files being written to the disk.
-        </td>
-	</tr>
-	<tr>
-		<td>UrlLoader</td>
-        <td>
-            The loader is suggested no matter what file you open from the disk. Selecting URL loader disables loading the 
-            file you selected and asks for a URL and loads it as a file. The name of the file will be its sha1. The IDB will 
-            be placed in the same directory as the original file you opened. The file gets extracted to a buffer 
-            without being written to the disk.
-        </td>
-	</tr>
-</table>
-	
-##  MemLoader & MemZipLoader & UrlLoader Tested On:
-<table>
-    <tr>
-        <td colspan="6">IDA version 7.5+</td>
-    </tr>
-	<tr>
-		<td>x64</td>
-		<td>pe</td>
-		<td>elf</td>
-		<td>arm</td>
-		<td>macho</td>
-		<td>shellcode(Binary)</td>
-	</tr>
-	<tr>
-		<td>x86</td>
-		<td>pe</td>
-		<td>elf</td>
-		<td>arm</td>
-		<td>macho</td>
-		<td>shellcode(Binary)</td>
-	</tr>
-</table>
+IDA 9.2 or later is required. The plugin uses only the Python standard library.
 
-## Known Issues
-* Loaders are working and tesed only for Windows OS.
-* X86 PEs in some cases the calling convention settings are not accurate.
-* PEs don't get their symbols loaded. Only flirt and types signatures applied.
-* MemZipLoader does not support opening zip inside a zip.
 
-## Credits
-* This open-source project is backed by [SentinelOne](https://www.sentinelone.com/blog/)
-* ZIP Lib [Zip](https://rikyoz.dev/bit7z/)
-* IDA SDK [IDA](https://www.hex-rays.com/products/ida/support/sdkdoc/index.html)
+## Loading a file in IDA
 
+Open a ZIP file as you would open any other file. The loader list shows "Memloader ZIP" next to IDA's built-in archive loader. Choose it, pick the member when the archive holds more than one file, and enter the password when the member is encrypted. The default password is `infected`. The database takes the member's name. For example, `sample.zip` with the member `sample.exe` produces `sample.exe.i64` next to the archive.
+
+To load from a URL, open any file, choose "Memloader URL" in the loader list, and enter the URL. The file you opened is ignored. The database is named after the SHA-256 of the downloaded bytes.
+
+When IDA does not recognize the extracted file, Memloader asks whether to load it as shellcode, and whether it is 32-bit or 64-bit.
+
+A ZIP member that is itself an archive is rejected. Nested archives are not supported.
+
+## Headless use
+
+Both loaders work with `idat` and idalib. Select the loader with `-T` and pass options with `-Omemloader:`. Options are `key=value` pairs separated by `;`.
+
+```
+idat -A -T"Memloader ZIP" -Omemloader:member=payload.exe;password=s3cret sample.zip
+idat -A -T"Memloader URL" -Omemloader:url=https://example.com/sample.bin placeholder.bin
+idat -A -T"Memloader ZIP" -Omemloader:bitness=64 shellcode.zip
+```
+
+| Option     | Meaning                                                   | Default    |
+|------------|-----------------------------------------------------------|------------|
+| `member`   | Name or path of the ZIP member to load                    | first file |
+| `password` | Password for encrypted members                            | `infected` |
+| `url`      | URL to download (URL loader only)                         | none       |
+| `bitness`  | `32` or `64`, used when the bytes are loaded as shellcode | `32`       |
+
+Without `-T`, IDA's own archive loader takes ZIP files in batch mode. Without a `url` option, the URL loader does not offer itself in batch mode, so plain files load as usual.
+
+## How IDA finds the loaders
+
+IDA only looks for loaders in its `loaders/` directories. At startup the plugin creates two symbolic links, `memloader_zip_loader.py` and `memloader_url_loader.py`, in the `loaders/` folder of your IDA user directory. They point at the loader entry files in the plugin directory. Each link names the plugin it belongs to, so you can always see where a loader comes from. When the plugin is upgraded or moved, the links are retargeted at the next start.
+
+On Windows, symbolic links need Developer Mode or an elevated IDA. Without either, the plugin creates hard links instead. These work the same way but do not show the plugin path.
+
+After you uninstall the plugin, the links stay behind. IDA ignores a dangling symbolic link. On Windows, a hard link keeps the small entry file, which then does nothing except print a message that names the file to delete. Both can be removed from the `loaders/` folder by hand.
+
+## Development
+
+```
+uv run --group dev pytest tests -v
+uvx --with ida-hcli hcli plugin install -e .
+```
+
+`tests/data/pma-lab01-01.zip` holds the Lab 01-01 executable and DLL from Practical Malware Analysis, encrypted with the password `infected`. It serves as a realistic sample for the loader tests and for trying the plugin by hand. The pure Python tests run anywhere. The idalib tests run when an IDA installation is available through `IDADIR` or `~/.idapro/ida-config.json`, and are skipped otherwise. The behavior is specified in `docs/plans/spec.md` and the implementation is described in `docs/plans/design.md`.

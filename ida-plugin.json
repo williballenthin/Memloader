@@ -1,0 +1,20 @@
+{
+  "IDAMetadataDescriptorVersion": 1,
+  "plugin": {
+    "name": "memloader",
+    "version": "1.0.0",
+    "entryPoint": "memloader_plugin.py",
+    "description": "Load files from ZIP archives or URLs into IDA without writing them to disk",
+    "license": "MIT",
+    "idaVersions": ">=9.2",
+    "platforms": ["windows-x86_64", "linux-x86_64", "macos-x86_64", "macos-aarch64"],
+    "categories": ["file-parsers-and-loaders", "malware-analysis"],
+    "keywords": ["loader", "zip", "url", "malware", "in-memory", "shellcode"],
+    "urls": {
+      "repository": "https://github.com/SentineLabs/Memloader"
+    },
+    "authors": [
+      {"name": "Willi Ballenthin", "email": "wballenthin@hex-rays.com"}
+    ]
+  }
+}
