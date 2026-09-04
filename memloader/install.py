@@ -42,6 +42,7 @@ class LoaderLink:
 LINKS = (
     LoaderLink("zip_loader"),
     LoaderLink("url_loader"),
+    LoaderLink("vt_loader"),
 )
 
 

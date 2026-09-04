@@ -1,6 +1,8 @@
 """Shared pipeline that loads an in-memory buffer into the current IDA database."""
 
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -45,6 +47,19 @@ def is_batch_mode() -> bool:
     return bool(ida_kernwin.cvar.batch)
 
 
+@contextmanager
+def wait_box(message: str) -> Iterator[None]:
+    """Show IDA's wait box around a long operation; nothing is shown in batch mode."""
+    if is_batch_mode():
+        yield
+        return
+    ida_kernwin.show_wait_box(f"HIDECANCEL\n{message}")
+    try:
+        yield
+    finally:
+        ida_kernwin.hide_wait_box()
+
+
 def get_options() -> LoadOptions:
     """Read the ``-Omemloader:...`` command line options.
 
@@ -58,12 +73,13 @@ def get_database_extension() -> str:
     return ".i64" if ida_idaapi.BADADDR == 0xFFFFFFFFFFFFFFFF else ".idb"
 
 
-def set_database_names(filename: str) -> Path:
+def set_database_names(filename: str, database_dir: Path | None = None) -> Path:
     """Name the database after the loaded buffer instead of the container file.
 
     The root filename always changes. The IDB path only changes in interactive
-    mode, so that headless callers keep the output path they chose. Returns the
-    path IDA will save the database to.
+    mode, so that headless callers keep the output path they chose. It then goes
+    into ``database_dir``, or next to the input file when no directory is given.
+    Returns the path IDA will save the database to.
 
     Raises:
         UserCancelled: the target IDB exists and the user declined to overwrite it.
@@ -75,7 +91,7 @@ def set_database_names(filename: str) -> Path:
     if is_batch_mode():
         return Path(ida_loader.get_path(ida_loader.PATH_TYPE_IDB))
 
-    idb_path = new_input.with_name(new_input.name + get_database_extension())
+    idb_path = (database_dir or input_dir) / (filename + get_database_extension())
     if idb_path.exists():
         answer = ida_kernwin.ask_yn(ida_kernwin.ASKBTN_YES, f"{idb_path} already exists. Overwrite it?")
         if answer != ida_kernwin.ASKBTN_YES:
@@ -125,11 +141,15 @@ def get_database_filetype(loader: LoaderInfo) -> int:
     return ida_ida.f_LOADER if loader.filetype == 1 else loader.filetype
 
 
-def load_buffer_into_ida(buffer: bytes, filename: str, neflags: int, options: LoadOptions) -> LoadResult:
+def load_buffer_into_ida(
+    buffer: bytes, filename: str, neflags: int, options: LoadOptions, database_dir: Path | None = None
+) -> LoadResult:
     """Load ``buffer`` into the current database using IDA's own file format loaders.
 
     The buffer never touches the disk. When no loader recognizes it, the buffer is
     mapped as shellcode instead. Must be called from within a loader's ``load_file``.
+    Interactively the database is written to ``database_dir``, or next to the input
+    file when no directory is given.
 
     Raises:
         LoadError: no usable loader, a nested archive, or the loader failed.
@@ -139,7 +159,7 @@ def load_buffer_into_ida(buffer: bytes, filename: str, neflags: int, options: Lo
     if not buffer:
         raise LoadError("buffer is empty")
 
-    set_database_names(filename)
+    set_database_names(filename, database_dir)
     kernel = IdaKernel.from_idadir()
 
     with kernel.bytearray_linput(buffer) as li, kernel.loaders_list(li, filename) as loaders:

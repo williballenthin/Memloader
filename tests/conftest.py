@@ -5,7 +5,7 @@ import shutil
 import sys
 import tempfile
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -16,10 +16,12 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from memloader.options import PLUGIN_OPTIONS_NAME  # noqa: E402
+from memloader.settings import PLUGIN_NAME  # noqa: E402
 from pe import build_minimal_pe  # noqa: E402
 from zipcrypto import make_encrypted_zip  # noqa: E402
 
 ZIP_ARGS = '-T"Memloader ZIP"'
+VT_ARGS = '-T"Memloader VirusTotal"'
 PMA_ARCHIVE = REPO_ROOT / "tests" / "data" / "pma-lab01-01.zip"
 PMA_PASSWORD = b"infected"
 URL_ARGS = '-T"Memloader URL"'
@@ -152,3 +154,24 @@ def http_server(tmp_path) -> Iterator[str]:
     finally:
         server.shutdown()
         server.server_close()
+
+
+@pytest.fixture
+def plugin_settings(ida) -> Iterator[Callable[[dict[str, str]], None]]:
+    """Write Memloader settings into the temporary IDAUSR's ida-config.json for one test.
+
+    ida-settings reads this file, so the loaders see the values exactly as they
+    would in a configured installation. The plugin entry is removed afterwards.
+    """
+    config_path = Path(os.environ["IDAUSR"]) / "ida-config.json"
+
+    def _write(settings: dict[str, str]) -> None:
+        config = json.loads(config_path.read_text()) if config_path.exists() else {}
+        config.setdefault("Plugins", {})[PLUGIN_NAME] = {"settings": settings}
+        config_path.write_text(json.dumps(config))
+
+    yield _write
+    if config_path.exists():
+        config = json.loads(config_path.read_text())
+        config.get("Plugins", {}).pop(PLUGIN_NAME, None)
+        config_path.write_text(json.dumps(config))

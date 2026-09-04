@@ -24,7 +24,12 @@ def test_value_may_contain_equals_sign():
     assert opts.url == "http://x/y?a=b"
 
 
-@pytest.mark.parametrize("text", ["member", "bogus=1", "bitness=16"])
+def test_sha256_is_normalized():
+    digest = "AB" * 32
+    assert LoadOptions.from_plugin_options(f"sha256={digest}").sha256 == "ab" * 32
+
+
+@pytest.mark.parametrize("text", ["member", "bogus=1", "bitness=16", "sha256=abc"])
 def test_rejects_malformed_options(text):
     with pytest.raises(OptionsError):
         LoadOptions.from_plugin_options(text)

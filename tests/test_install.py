@@ -153,8 +153,8 @@ def test_orphaned_hard_link_stays_inert_and_asks_for_cleanup(ida, tmp_path):
     assert result.returncode == 0, result.stderr
     assert "filetype 11" in result.stdout
     assert "Traceback" not in result.stdout + result.stderr
-    assert f"Delete {idausr}/loaders/memloader_zip_loader.py" in result.stdout
-    assert f"Delete {idausr}/loaders/memloader_url_loader.py" in result.stdout
+    for link in LINKS:
+        assert f"Delete {idausr}/loaders/{link.filename}" in result.stdout
 
 
 def test_install_is_idempotent_and_retargets_when_root_moves(tmp_path):
